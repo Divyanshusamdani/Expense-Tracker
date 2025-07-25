@@ -5,6 +5,11 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 import requests
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
 
 # Global Theme & Style
 st.set_page_config(page_title="Expense Tracker", page_icon="💰", layout="wide")
@@ -39,7 +44,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --------- DB Functions (backend logic same as original) ----------
+# --------- DB Functions (unchanged) ----------
 def get_db():
     return sqlite3.connect('tracker.db', check_same_thread=False)
 
@@ -116,7 +121,7 @@ def update_income(income_id, amount, source, note, date):
     conn.commit()
     conn.close()
 
-# --------- Beautiful Login Screen ----------
+# --------- Login Screen (unchanged) ----------
 def login_screen():
     st.markdown("""
         <div class="login-card">
@@ -142,7 +147,7 @@ def login_screen():
         st.session_state.page = "register"
     st.markdown("</div>", unsafe_allow_html=True)
 
-# --------- Register Screen (Matching Card Style!) ----------
+# --------- Register Screen (unchanged) ----------
 def register_screen():
     st.markdown("""
         <div class="login-card">
@@ -175,9 +180,12 @@ def register_screen():
         st.session_state.page = "login"
     st.markdown("</div>", unsafe_allow_html=True)
 
-# --------- AI Chatbot Tab (as before) ----------
+# --------- AI Chatbot Tab (Updated) ----------
 def advisor_tab(user_id):
-    st.header("🤖 AI FINANCE CHATBOT (Local Ollama)")
+    st.header("🤖 AI FINANCE CHATBOT")
+    # Load Ollama host from environment variable
+    ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    
     if "messages" not in st.session_state:
         st.session_state.messages = [{"role": "assistant", "content": "Hi! Ask me anything about your finances 💰"}]
 
@@ -202,10 +210,10 @@ def advisor_tab(user_id):
         - Current Balance: ₹{bal:,.2f}
         """
         with st.chat_message("assistant"):
-            with st.spinner("Analyzing using local Ollama model..."):
+            with st.spinner("Analyzing using Ollama model..."):
                 try:
                     response = requests.post(
-                        "http://localhost:11434/api/chat",
+                        f"{ollama_host}/api/chat",
                         json={
                             "model": "phi3:3.8b",
                             "messages": [
@@ -214,7 +222,8 @@ def advisor_tab(user_id):
                             ],
                             "stream": False
                         },
-                        timeout=180
+                        timeout=180,
+                        verify=False  # Handle ngrok's self-signed certificates
                     )
                     if response.status_code == 200:
                         result = response.json()
@@ -222,15 +231,17 @@ def advisor_tab(user_id):
                     else:
                         st.error(f"Status Code: {response.status_code}")
                         st.error(f"Response Text: {response.text}")
-                        answer = "Sorry, API returned an error. Check server logs."
+                        answer = "Sorry, API returned an error. Check server logs or ensure the Colab server is running."
                     st.write(answer)
                     st.session_state.messages.append({"role": "assistant", "content": answer})
                 except requests.exceptions.ConnectionError:
-                    st.error("❌ Ollama server not running! Start it via 'ollama serve' in your terminal.")
+                    st.error(f"❌ Cannot connect to Ollama server at {ollama_host}. Ensure the Colab server is running and the ngrok URL is valid.")
+                except requests.exceptions.Timeout:
+                    st.error(f"❌ Request to {ollama_host} timed out. The server might be slow or offline.")
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
 
-# --------- Dashboard & Tabs ----------
+# --------- Dashboard & Tabs (unchanged) ----------
 def dashboard(user_id):
     if "username" not in st.session_state:
         st.warning("Session expired. Please log in again.")
@@ -365,7 +376,7 @@ def dashboard(user_id):
     with tab_ai:
         advisor_tab(user_id)
 
-# --------- Reports Tab ----------
+# --------- Reports Tab (unchanged) ----------
 def reports_tab(user_id):
     st.header("📊 Advanced Analytics & Reports")
     exp_df = get_expenses(user_id)
@@ -395,7 +406,7 @@ def reports_tab(user_id):
         fig_inc_line = px.line(inc_trend, x='month', y='amount', markers=True, title='Monthly Income Trend', line_shape='spline')
         st.plotly_chart(fig_inc_line, use_container_width=True)
 
-# --------- MAIN ROUTER ----------
+# --------- MAIN ROUTER (unchanged) ----------
 def main():
     if "page" not in st.session_state:
         st.session_state.page = "login"
